@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>William Herbert Interactive Dashboard Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin:0; display:flex; flex-direction:column; height:100vh; font-family:Arial, sans-serif; }
+    #main { flex:1; display:flex; }
+    #sidebar {
+      width: 300px; background:#000; color:#f1c40f; padding:20px;
+      display:flex; flex-direction:column;
+    }
+    #sidebar h2 { margin:0 0 15px; font-size:20px; color:#f1c40f; }
+    #sidebar ul { list-style:none; padding:0; margin:0; flex:1; }
+    #sidebar li { margin:8px 0; cursor:pointer; color:#f1c40f; }
+    #sidebar li:hover { color:#ffd700; }
+    #searchBox { padding:8px; border:none; border-radius:4px; margin-bottom:15px; width:100%; }
+    #map { flex:1; border:8px solid #34495e; position:relative; }
+    #qrBox {
+      text-align:center; margin-top:20px; padding:10px;
+      background:#111; border-radius:8px;
+    }
+    #qrBox img { width:160px; border:3px solid #f1c40f; border-radius:8px; }
+    #qrBox p { margin:8px 0 0; color:#f1c40f; font-weight:bold; }
+    #datatable {
+      background:#1a1a1a; padding:10px; height:200px; overflow-y:auto;
+      font-size:14px; border-top:4px solid #2c3e50;
+    }
+    table { width:100%; border-collapse:collapse; }
+    th, td { border:1px solid #444; padding:6px; text-align:left; }
+    th { background:#000; color:#f1c40f; }
+    td { color:#f1c40f; }
+    /* Attribute form popup */
+    #attrForm {
+      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      background:white; padding:20px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.4);
+      display:none; z-index:999;
+    }
+    #attrForm h3 { margin-top:0; }
+    #attrForm button { margin-top:10px; padding:6px 12px; }
+    /* Map labels */
+    .map-label {
+      background:#000; color:#f1c40f; font-weight:bold;
+      border:none; padding:2px 6px; border-radius:4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="main">
+    <div id="sidebar">
+      <h2>🏟️ William Herbert Interactive Dashboard Map</h2>
+      <input id="searchBox" type="text" placeholder="Search activity...">
+      <ul id="legend">
+        <li data-activity="Gazebo">🏕️ Gazebo Registration</li>
+        <li data-activity="Bus Parking">🚌 Bus Parking</li>
+        <li data-activity="Vehicle Parking">🚗 Vehicle Parking</li>
+        <li data-activity="Portable Toilets">🚻 Portable Toilets</li>
+        <li data-activity="Soccer Final">⚽ Soccer Final</li>
+        <li data-activity="Food Vendors">🍔 Food Vendors</li>
+        <li data-activity="Netball Match">🏐 Netball Match</li>
+        <li data-activity="Exhibition Stakeholders">🎪 Exhibition Stakeholders</li>
+        <li data-activity="Aerobics">💃 Aerobics</li>
+        <li data-activity="Soccer">⚽ Soccer</li>
+        <li data-activity="DJ Booth">🎧 DJ Booth</li>
+      </ul>
+     <!-- QR Code aligned at bottom -->
+        <div id="qrBox">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?data=https://williamherbertstadium-eventinfo.com&size=160x160">
+        <p>Event Info</p>
+      </div>
+    </div>
+    <div id="map"></div>
+  </div>
+  <div id="datatable">
+    <table>
+      <thead>
+        <tr><th>Activity</th><th>Latitude</th><th>Longitude</th></tr>
+      </thead>
+      <tbody id="activityTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Attribute Form -->
+  <div id="attrForm">
+    <h3>Activity Details</h3>
+    <p id="attrContent"></p>
+    <button onclick="document.getElementById('attrForm').style.display='none'">Close</button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map').setView([-34.010742, 18.481822], 17);
+
+    // Basemaps
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+    var satellite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+      {maxZoom:20, subdomains:['mt0','mt1','mt2','mt3']});
+    L.control.layers({"OSM":osm,"Satellite":satellite}).addTo(map);
+
+    // Activities
+    var activities = {
+      "Gazebo":[-34.010899,18.480597],
+      "Bus Parking":[-34.011088,18.480640],
+      "Vehicle Parking":[-34.011346,18.480769],
+      "Portable Toilets":[-34.011035,18.481026],
+      "Soccer Final":[-34.011541,18.481678],
+      "Food Vendors":[-34.011802,18.480731],
+      "Netball Match":[-34.012044,18.480927],
+      "Exhibition Stakeholders":[-34.012342,18.481069],
+      "Aerobics":[-34.012709,18.481289],
+      "Soccer":[-34.012615,18.481911],
+      "Soccer2":[-34.012477,18.482716],
+      "Soccer3":[-34.012417,18.483317],
+      "DJ Booth":[-34.011581,18.481230]
+    };
+
+    var markers = {};
+    var tableBody = document.getElementById("activityTable");
+
+    for (var key in activities){
+      var marker = L.marker(activities[key]).addTo(map)
+        .bindPopup("<b>"+key+"</b>")
+        .bindTooltip(key, {permanent:true, direction:"right", className:"map-label"});
+      markers[key] = marker;
+
+      // Populate table
+      var row = document.createElement("tr");
+      row.innerHTML = "<td>"+key+"</td><td>"+activities[key][0]+"</td><td>"+activities[key][1]+"</td>";
+      row.addEventListener("click", function(){
+        var cells = this.getElementsByTagName("td");
+        var actName = cells[0].innerText;
+        var lat = parseFloat(cells[1].innerText);
+        var lng = parseFloat(cells[2].innerText);
+        document.getElementById("attrContent").innerHTML =
+          "<b>Activity:</b> "+actName+"<br><b>Latitude:</b> "+lat+"<br><b>Longitude:</b> "+lng;
+        document.getElementById("attrForm").style.display="block";
+        map.setView([lat,lng],19);
+        markers[actName]?.openPopup();
+      });
+      tableBody.appendChild(row);
+    }
+
+    // Legend click zoom
+    document.querySelectorAll('#legend li').forEach(function(item){
+      item.addEventListener('click', function(){
+        var act = this.getAttribute('data-activity');
+        if(markers[act]) {
+          map.setView(markers[act].getLatLng(), 19);
+          markers[act].openPopup();
+        }
+      });
+    });
+
+    // Search by activity
+    document.getElementById('searchBox').addEventListener('keyup', function(e){
+      if(e.key==="Enter"){
+        var query = this.value.trim();
+        if(markers[query]) {
+          map.setView(markers[query].getLatLng(), 19);
+          markers[query].openPopup();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
